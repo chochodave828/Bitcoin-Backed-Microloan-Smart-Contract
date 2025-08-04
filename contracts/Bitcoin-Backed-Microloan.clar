@@ -8,6 +8,8 @@
 (define-constant ERR_LOAN_OVERDUE (err u106))
 (define-constant ERR_INSUFFICIENT_BALANCE (err u107))
 (define-constant ERR_INVALID_AMOUNT (err u108))
+(define-constant ERR_INSUFFICIENT_EXCESS_COLLATERAL (err u109))
+(define-constant ERR_COLLATERAL_RATIO_VIOLATION (err u110))
 
 (define-constant COLLATERAL_RATIO u150)
 (define-constant LIQUIDATION_PENALTY u10)
@@ -219,4 +221,68 @@
     interest-rate: INTEREST_RATE,
     loan-duration: LOAN_DURATION
   }
+)
+
+(define-public (add-collateral (loan-id uint) (additional-amount uint))
+  (let (
+    (loan-data (unwrap! (map-get? loans loan-id) ERR_LOAN_NOT_FOUND))
+    (new-collateral-amount (+ (get collateral-amount loan-data) additional-amount))
+  )
+    (asserts! (is-eq (get borrower loan-data) tx-sender) ERR_UNAUTHORIZED)
+    (asserts! (is-eq (get status loan-data) "active") ERR_LOAN_NOT_ACTIVE)
+    (asserts! (> additional-amount u0) ERR_INVALID_AMOUNT)
+    
+    (try! (stx-transfer? additional-amount tx-sender (as-contract tx-sender)))
+    
+    (map-set loans loan-id (merge loan-data {
+      collateral-amount: new-collateral-amount
+    }))
+    
+    (set-contract-balance "btc" (+ (get-contract-balance "btc") additional-amount))
+    (ok true)
+  )
+)
+
+(define-public (remove-collateral (loan-id uint) (withdrawal-amount uint))
+  (let (
+    (loan-data (unwrap! (map-get? loans loan-id) ERR_LOAN_NOT_FOUND))
+    (required-collateral (/ (* (get loan-amount loan-data) COLLATERAL_RATIO) u100))
+    (new-collateral-amount (- (get collateral-amount loan-data) withdrawal-amount))
+    (excess-collateral (- (get collateral-amount loan-data) required-collateral))
+  )
+    (asserts! (is-eq (get borrower loan-data) tx-sender) ERR_UNAUTHORIZED)
+    (asserts! (is-eq (get status loan-data) "active") ERR_LOAN_NOT_ACTIVE)
+    (asserts! (> withdrawal-amount u0) ERR_INVALID_AMOUNT)
+    (asserts! (<= withdrawal-amount excess-collateral) ERR_INSUFFICIENT_EXCESS_COLLATERAL)
+    (asserts! (>= new-collateral-amount required-collateral) ERR_COLLATERAL_RATIO_VIOLATION)
+    
+    (try! (as-contract (stx-transfer? withdrawal-amount tx-sender (get borrower loan-data))))
+    
+    (map-set loans loan-id (merge loan-data {
+      collateral-amount: new-collateral-amount
+    }))
+    
+    (set-contract-balance "btc" (- (get-contract-balance "btc") withdrawal-amount))
+    (ok true)
+  )
+)
+
+(define-read-only (get-excess-collateral (loan-id uint))
+  (match (map-get? loans loan-id)
+    loan-data
+    (let (
+      (required-collateral (/ (* (get loan-amount loan-data) COLLATERAL_RATIO) u100))
+      (current-collateral (get collateral-amount loan-data))
+    )
+      (ok {
+        current-collateral: current-collateral,
+        required-collateral: required-collateral,
+        excess-collateral: (if (> current-collateral required-collateral) 
+                             (- current-collateral required-collateral) 
+                             u0),
+        collateral-ratio: (/ (* current-collateral u100) (get loan-amount loan-data))
+      })
+    )
+    ERR_LOAN_NOT_FOUND
+  )
 )
