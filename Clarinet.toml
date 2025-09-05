@@ -1,0 +1,33 @@
+[project]
+name = 'Bitcoin-Backed-Microloan'
+description = ''
+authors = []
+telemetry = true
+cache_dir = '.\.cache'
+requirements = []
+[contracts.Bitcoin-Backed-Microloan]
+path = 'contracts/Bitcoin-Backed-Microloan.clar'
+clarity_version = 3
+epoch = 3.1
+
+[contracts.loan-extension-feature]
+path = 'contracts/loan-extension-feature.clar'
+clarity_version = 3
+epoch = 3.1
+
+[contracts.Loan-Extension-Renewal-System]
+path = 'contracts/Loan-Extension-Renewal-System.clar'
+clarity_version = 3
+epoch = 3.1
+[repl.analysis]
+passes = ['check_checker']
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false
+
+[repl.remote_data]
+enabled = false
+api_url = 'https://api.hiro.so'
