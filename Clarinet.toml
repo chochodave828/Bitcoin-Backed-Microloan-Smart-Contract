@@ -19,6 +19,11 @@ epoch = 3.1
 path = 'contracts/Loan-Extension-Renewal-System.clar'
 clarity_version = 3
 epoch = 3.1
+
+[contracts.borrower-credit-score]
+path = 'contracts/borrower-credit-score.clar'
+clarity_version = 3
+epoch = 3.1
 [repl.analysis]
 passes = ['check_checker']
 
